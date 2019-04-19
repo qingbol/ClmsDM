@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import six
-from dilated import _dilated_conv2d
+from .dilated import _dilated_conv2d
 
 
 

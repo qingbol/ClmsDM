@@ -6,8 +6,9 @@ import numpy as np
 import tensorflow as tf
 from PIL import Image
 
-from network import *
-from utils import ImageReader, decode_labels, inv_preprocess, prepare_label, write_log, read_labeled_image_list
+from .network import *
+sys.path.append("..")
+from tools import ImageReader, decode_labels, inv_preprocess, prepare_label, write_log, read_labeled_image_list
 
 
 
