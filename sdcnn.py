@@ -1,15 +1,27 @@
-import argparse
+#Qingbo, Xin yu
+#This script defines some parameters and is the entry.
 import os
 import tensorflow as tf
 from models.model import Model
 
-"""
-This script defines hyperparameters.
-"""
+def main(_):
+	#call set_parameter function to intialize the super parameters 
+	PARA=set_parameter()
+	print(PARA.data_dir)
 
-def configure():
+	#establish the session variable
+	sess = tf.Session()
+	# establish a model object
+	model = Model(sess, PARA)
+	#model = Model(sess, set_parameter())
+	# act=PARA.action
+	# print(act)
+	#model.eval(act)()
+	getattr(model,PARA.action)()
+	#getattr(model, args.option)()
+
+def set_parameter():
 	flags = tf.app.flags
-
 	# training
 	flags.DEFINE_integer('num_steps', 200, 'maximum number of iterations')
 	flags.DEFINE_integer('save_interval', 10, 'number of iterations for saving and visualization')
@@ -19,8 +31,10 @@ def configure():
 	flags.DEFINE_float('power', 0.9, 'hyperparameter for poly learning rate')
 	flags.DEFINE_float('momentum', 0.9, 'momentum')
 	flags.DEFINE_string('encoder_name', 'deeplab', 'name of pre-trained model: res101, res50 or deeplab')
-	flags.DEFINE_string('pretrain_file', '/Users/tarus/OnlyInMac/dilated_cnn/pretrain_model/deeplab_resnet_init.ckpt', 'pre-trained model filename corresponding to encoder_name')
+	flags.DEFINE_string('pretrain_file', '/Users/tarus/OnlyInMac/dilated_cnn/pretrain_model/deeplab_resnet_init.ckpt', 
+											'pre-trained model filename corresponding to encoder_name')
 	flags.DEFINE_string('dilated_type', 'smooth_SSC', 'type of dilated conv: regular, decompose, smooth_GI or smooth_SSC')
+	# flags.DEFINE_string('dilated_type', 'SSC', 'type of dilated conv: Basic,Decompose,GI,SSC')
 	flags.DEFINE_string('data_list', './dataset/train.txt', 'training data list filename')
 
 	# validation
@@ -50,30 +64,10 @@ def configure():
 	flags.DEFINE_string('modeldir', 'model', 'model directory')
 	flags.DEFINE_string('logfile', 'log.txt', 'training log filename')
 	flags.DEFINE_string('logdir', 'log', 'training log directory')
+	flags.DEFINE_string('action', 'train', 'train/test/predict')
 	
 	flags.FLAGS.__dict__['__parsed'] = False
 	return flags.FLAGS
-
-
-def main(_):
-	parser = argparse.ArgumentParser()
-	parser.add_argument('--option', dest='option', type=str, default='train',
-		help='actions: train, test, or predict')
-	args = parser.parse_args()
-
-	if args.option not in ['train', 'test', 'predict']:
-		print('invalid option: ', args.option)
-		print("Please input a option: train, test, or predict")
-	else:
-		# Set up tf session and initialize variables. 
-		# config = tf.ConfigProto()
-		# config.gpu_options.allow_growth = True
-		# sess = tf.Session(config=config)
-		sess = tf.Session()
-		# Run
-		model = Model(sess, configure())
-		getattr(model, args.option)()
-
 
 if __name__ == '__main__':
 	# Choose which gpu or cpu to use
