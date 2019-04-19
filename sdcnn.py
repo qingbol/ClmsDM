@@ -20,7 +20,7 @@ def configure():
 	flags.DEFINE_float('momentum', 0.9, 'momentum')
 	flags.DEFINE_string('encoder_name', 'deeplab', 'name of pre-trained model: res101, res50 or deeplab')
 	flags.DEFINE_string('pretrain_file', '/Users/tarus/OnlyInMac/dilated_cnn/pretrain_model/deeplab_resnet_init.ckpt', 'pre-trained model filename corresponding to encoder_name')
-	flags.DEFINE_string('dilated_type', 'smooth_SSC', 'type of dilated conv: regular, decompose, smooth_GI or smooth_SSC')
+	flags.DEFINE_string('dilated_type', 'SSC', 'type of dilated conv: Basic,Decompose,GI,SSC')
 	flags.DEFINE_string('data_list', './dataset/train.txt', 'training data list filename')
 
 	# validation

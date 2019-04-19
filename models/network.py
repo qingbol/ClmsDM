@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import six
-from .dilated import _dilated_conv2d
+from .dilated import DilatedConv_4Mehtods
 
 
 
@@ -110,7 +110,7 @@ class Deeplab_v2(object):
 		o_b2a = self._conv2d(x, 1, num_o / 4, 1, name='res%s_branch2a' % name)
 		o_b2a = self._batch_norm(o_b2a, name='bn%s_branch2a' % name, is_training=False, activation_fn=tf.nn.relu)
 
-		o_b2b = _dilated_conv2d(self.dilated_type, o_b2a, 3, num_o / 4, dilation_factor, name='res%s_branch2b' % name)
+		o_b2b = DilatedConv_4Mehtods(self.dilated_type, o_b2a, 3, num_o / 4, dilation_factor, name='res%s_branch2b' % name)
 		o_b2b = self._batch_norm(o_b2b, name='bn%s_branch2b' % name, is_training=False, activation_fn=tf.nn.relu)
 
 		o_b2c = self._conv2d(o_b2b, 1, num_o, 1, name='res%s_branch2c' % name)
@@ -124,7 +124,7 @@ class Deeplab_v2(object):
 	def _ASPP(self, x, num_o, dilations):
 		o = []
 		for i, d in enumerate(dilations):
-			o.append(_dilated_conv2d('regular', x, 3, num_o, d, name='fc1_voc12_c%d' % i, biased=True))
+			o.append(DilatedConv_4Mehtods('Basic', x, 3, num_o, d, name='fc1_voc12_c%d' % i, biased=True))
 		return self._add(o, name='fc1_voc12')
 
 	# layers
@@ -273,7 +273,7 @@ class ResNet_segmentation(object):
 		o_b2a = self._conv2d(x, 1, num_o / 4, 1, name='%s/bottleneck_v1/conv1' % name)
 		o_b2a = self._batch_norm(o_b2a, name='%s/bottleneck_v1/conv1' % name, is_training=False, activation_fn=tf.nn.relu)
 
-		o_b2b = _dilated_conv2d(self.dilated_type, o_b2a, 3, num_o / 4, dilation_factor, name='%s/bottleneck_v1/conv2' % name)
+		o_b2b = DilatedConv_4Mehtods(self.dilated_type, o_b2a, 3, num_o / 4, dilation_factor, name='%s/bottleneck_v1/conv2' % name)
 		o_b2b = self._batch_norm(o_b2b, name='%s/bottleneck_v1/conv2' % name, is_training=False, activation_fn=tf.nn.relu)
 
 		o_b2c = self._conv2d(o_b2b, 1, num_o, 1, name='%s/bottleneck_v1/conv3' % name)
@@ -287,7 +287,7 @@ class ResNet_segmentation(object):
 	def _ASPP(self, x, num_o, dilations):
 		o = []
 		for i, d in enumerate(dilations):
-			o.append(_dilated_conv2d('regular', x, 3, num_o, d, name='aspp/conv%d' % (i+1), biased=True))
+			o.append(DilatedConv_4Mehtods('Basic', x, 3, num_o, d, name='aspp/conv%d' % (i+1), biased=True))
 		return self._add(o, name='aspp/add')
 
 	# layers
