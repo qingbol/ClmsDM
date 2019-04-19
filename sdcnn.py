@@ -1,5 +1,5 @@
 #Qingbo, Xin yu
-#This script defines some parameters and is the entry.
+#This script is the entry file and defines some parameters.
 import os
 import tensorflow as tf
 from models.model import Model
@@ -13,12 +13,8 @@ def main(_):
 	sess = tf.Session()
 	# establish a model object
 	model = Model(sess, PARA)
-	#model = Model(sess, set_parameter())
-	# act=PARA.action
-	# print(act)
-	#model.eval(act)()
+	#start training or testing
 	getattr(model,PARA.action)()
-	#getattr(model, args.option)()
 
 def set_parameter():
 	flags = tf.app.flags
@@ -30,10 +26,9 @@ def set_parameter():
 	flags.DEFINE_float('learning_rate', 0.001, 'learning rate')
 	flags.DEFINE_float('power', 0.9, 'hyperparameter for poly learning rate')
 	flags.DEFINE_float('momentum', 0.9, 'momentum')
-	flags.DEFINE_string('encoder_name', 'deeplab', 'name of pre-trained model: res101, res50 or deeplab')
+	# flags.DEFINE_string('encoder_name', 'deeplab', 'name of pre-trained model: res101, res50 or deeplab')
 	flags.DEFINE_string('pretrain_file', '/Users/tarus/OnlyInMac/dilated_cnn/pretrain_model/deeplab_resnet_init.ckpt', 
 											'pre-trained model filename corresponding to encoder_name')
-	#flags.DEFINE_string('dilated_type', 'smooth_SSC', 'type of dilated conv: regular, decompose, smooth_GI or smooth_SSC')
 	flags.DEFINE_string('dilated_type', 'SSC', 'type of dilated conv: Basic,Decompose,GI,SSC')
 	flags.DEFINE_string('data_list', './dataset/train.txt', 'training data list filename')
 
@@ -51,7 +46,6 @@ def set_parameter():
 
 	# data
 	flags.DEFINE_string('data_dir', '/Users/tarus/OnlyInMac/dilated_cnn/VOC2012', 'data directory')
-	# flags.DEFINE_string('data_dir', '/tempspace2/zwang6/VOC2012', 'data directory')
 	flags.DEFINE_integer('batch_size', 8, 'training batch size')
 	flags.DEFINE_integer('input_height', 321, 'input image height')
 	flags.DEFINE_integer('input_width', 321, 'input image width')
@@ -70,6 +64,6 @@ def set_parameter():
 	return flags.FLAGS
 
 if __name__ == '__main__':
-	# Choose which gpu or cpu to use
+	# set  GPU
 	os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
 	tf.app.run()
