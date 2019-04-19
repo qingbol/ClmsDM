@@ -89,7 +89,7 @@ def DilatedConv_SSC(x, k, num_out, factor, name, biased=False):
 		mask[factor - 1, factor - 1, 0, 0, 0] = 1
 		fix_w = tf.add(fix_w, tf.constant(mask, dtype=tf.float32))
 		output = tf.expand_dims(x, -1)
-		output = tf.nn.conv3d(output, fix_w, strides=[1]*4, padding='SAME')
+		output = tf.nn.conv3d(output, fix_w, strides=[1]*5, padding='SAME')
 		output = tf.squeeze(output, -1)
 		w = tf.get_variable('weights', shape=[k, k, num_input, num_out])
 		output = tf.nn.atrous_conv2d(output, w, factor, padding='SAME')
