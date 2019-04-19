@@ -9,22 +9,11 @@ from PIL import Image
 from .network import *
 sys.path.append("..")
 from tools import ImageReader, decode_labels, inv_preprocess, prepare_label, write_log, read_labeled_image_list
+from tools.image_reader import IMG_MEAN
 
 
 
-"""
-This script trains or evaluates the model on augmented PASCAL VOC 2012 dataset.
-The training set contains 10581 training images.
-The validation set contains 1449 validation images.
 
-Training:
-'poly' learning rate
-different learning rates for different layers
-"""
-
-
-
-IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434), dtype=np.float32)
 
 class Model(object):
 
@@ -38,14 +27,9 @@ class Model(object):
 
 		self.sess.run(tf.global_variables_initializer())
 
-		# Load the pre-trained model if provided
 		if self.conf.pretrain_file is not None:
 			self.load(self.loader, self.conf.pretrain_file)
-
-		# Start queue threads.
 		threads = tf.train.start_queue_runners(coord=self.coord, sess=self.sess)
-
-		# Train!
 		for step in range(self.conf.num_steps+1):
 			start_time = time.time()
 			feed_dict = { self.curr_step : step }
@@ -69,25 +53,20 @@ class Model(object):
 			print('step {:d} \t loss = {:.3f}, ({:.3f} sec/step)'.format(step, loss_value, duration))
 			write_log('{:d}, {:.3f}'.format(step, loss_value), self.conf.logfile)
 
-		# finish
 		self.coord.request_stop()
 		self.coord.join(threads)
 
-	# evaluate
 	def test(self):
 		self.test_setup()
 
 		self.sess.run(tf.global_variables_initializer())
 		self.sess.run(tf.local_variables_initializer())
 
-		# load checkpoint
 		checkpointfile = self.conf.modeldir+ '/model.ckpt-' + str(self.conf.valid_step)
 		self.load(self.loader, checkpointfile)
 
-		# Start queue threads.
 		threads = tf.train.start_queue_runners(coord=self.coord, sess=self.sess)
 
-		# Test!
 		confusion_matrix = np.zeros((self.conf.num_classes, self.conf.num_classes), dtype=np.int)
 		for step in range(self.conf.valid_num_steps):
 			preds, _, _, c_matrix = self.sess.run([self.pred, self.accu_update_op, self.mIou_update_op, self.confusion_matrix])
@@ -98,40 +77,30 @@ class Model(object):
 		print('Mean IoU: {:.3f}'.format(self.mIoU.eval(session=self.sess)))
 		self.compute_IoU_per_class(confusion_matrix)
 
-		# finish
 		self.coord.request_stop()
 		self.coord.join(threads)
 
-	# prediction
 	def predict(self):
 		self.predict_setup()
 
 		self.sess.run(tf.global_variables_initializer())
 		self.sess.run(tf.local_variables_initializer())
 
-		# load checkpoint
 		checkpointfile = self.conf.modeldir+ '/model.ckpt-' + str(self.conf.valid_step)
 		self.load(self.loader, checkpointfile)
 
-		# Start queue threads.
 		threads = tf.train.start_queue_runners(coord=self.coord, sess=self.sess)
 
-		# img_name_list
 		image_list, _ = read_labeled_image_list('', self.conf.test_data_list)
 
-		# Predict!
 		for step in range(self.conf.test_num_steps):
 			preds = self.sess.run(self.pred)
 
 			img_name = image_list[step].split('/')[2].split('.')[0]
-			# Save raw predictions, i.e. each pixel is an integer between [0,20].
 			im = Image.fromarray(preds[0,:,:,0], mode='L')
 			filename = '/%s_mask.png' % (img_name)
 			im.save(self.conf.out_dir + '/prediction' + filename)
 
-			# Save predictions for visualization.
-			# See utils/label_utils.py for color setting
-			# Need to be modified based on datasets.
 			if self.conf.visual:
 				msk = decode_labels(preds, num_classes=self.conf.num_classes)
 				im = Image.fromarray(msk[0], mode='RGB')
@@ -143,20 +112,14 @@ class Model(object):
 
 		print('The output files has been saved to {}'.format(self.conf.out_dir))
 
-		# finish
 		self.coord.request_stop()
 		self.coord.join(threads)
 
 	def train_setup(self):
 		tf.set_random_seed(self.conf.random_seed)
 		
-		# Create queue coordinator.
 		self.coord = tf.train.Coordinator()
-
-		# Input size
 		input_size = (self.conf.input_height, self.conf.input_width)
-		
-		# Load reader
 		with tf.name_scope("create_inputs"):
 			reader = ImageReader(
 				self.conf.data_dir,
@@ -169,46 +132,22 @@ class Model(object):
 				self.coord)
 			self.image_batch, self.label_batch = reader.dequeue(self.conf.batch_size)
 		
-		# Create network
-		if self.conf.encoder_name not in ['res101', 'res50', 'deeplab']:
-			print('encoder_name ERROR!')
-			print("Please input: res101, res50, or deeplab")
-			sys.exit(-1)
-		elif self.conf.encoder_name == 'deeplab':
-			net = Deeplab_v2(self.image_batch, self.conf.num_classes, True, self.conf.dilated_type)
-			# Variables that load from pre-trained model.
-			restore_var = [v for v in tf.global_variables() if 'fc' not in v.name and 'fix_w' not in v.name]
-			# Trainable Variables
-			all_trainable = tf.trainable_variables()
-			# Fine-tune part
-			encoder_trainable = [v for v in all_trainable if 'fc' not in v.name] # lr * 1.0
-			# Decoder part
-			decoder_trainable = [v for v in all_trainable if 'fc' in v.name]
-		else:
-			net = ResNet_segmentation(self.image_batch, self.conf.num_classes, True, self.conf.encoder_name, self.conf.dilated_type)
-			# Variables that load from pre-trained model.
-			restore_var = [v for v in tf.global_variables() if 'resnet_v1' in v.name and 'fix_w' not in v.name]
-			# Trainable Variables
-			all_trainable = tf.trainable_variables()
-			# Fine-tune part
-			encoder_trainable = [v for v in all_trainable if 'resnet_v1' in v.name] # lr * 1.0
-			# Decoder part
-			decoder_trainable = [v for v in all_trainable if 'decoder' in v.name]
+		net = Deeplab_v2(self.image_batch, self.conf.num_classes, True, self.conf.dilated_type)
+		restore_var = [v for v in tf.global_variables() if 'fc' not in v.name and 'fix_w' not in v.name]
+		all_trainable = tf.trainable_variables()
+		encoder_trainable = [v for v in all_trainable if 'fc' not in v.name] 
+		decoder_trainable = [v for v in all_trainable if 'fc' in v.name]
 		
-		decoder_w_trainable = [v for v in decoder_trainable if 'weights' in v.name or 'gamma' in v.name] # lr * 10.0
-		decoder_b_trainable = [v for v in decoder_trainable if 'biases' in v.name or 'beta' in v.name] # lr * 20.0
-		# Check
+		decoder_w_trainable = [v for v in decoder_trainable if 'weights' in v.name or 'gamma' in v.name] 
+		decoder_b_trainable = [v for v in decoder_trainable if 'biases' in v.name or 'beta' in v.name] 
 		assert(len(all_trainable) == len(decoder_trainable) + len(encoder_trainable))
 		assert(len(decoder_trainable) == len(decoder_w_trainable) + len(decoder_b_trainable))
 
-		# Network raw output
-		raw_output = net.outputs # [batch_size, h, w, 21]
+		raw_output = net.outputs 
 
-		# Output size
 		output_shape = tf.shape(raw_output)
 		output_size = (output_shape[1], output_shape[2])
 
-		# Groud Truth: ignoring all labels greater or equal than n_classes
 		label_proc = prepare_label(self.label_batch, output_size, num_classes=self.conf.num_classes, one_hot=False)
 		raw_gt = tf.reshape(label_proc, [-1,])
 		indices = tf.squeeze(tf.where(tf.less_equal(raw_gt, self.conf.num_classes - 1)), 1)
@@ -216,48 +155,39 @@ class Model(object):
 		raw_prediction = tf.reshape(raw_output, [-1, self.conf.num_classes])
 		prediction = tf.gather(raw_prediction, indices)
 
-		# Pixel-wise softmax_cross_entropy loss
 		loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=prediction, labels=gt)
 		# L2 regularization
 		l2_losses = [self.conf.weight_decay * tf.nn.l2_loss(v) for v in all_trainable if 'weights' in v.name]
 		# Loss function
 		self.reduced_loss = tf.reduce_mean(loss) + tf.add_n(l2_losses)
 
-		# Define optimizers
-		# 'poly' learning rate
 		base_lr = tf.constant(self.conf.learning_rate)
 		self.curr_step = tf.placeholder(dtype=tf.float32, shape=())
 		learning_rate = tf.scalar_mul(base_lr, tf.pow((1 - self.curr_step / self.conf.num_steps), self.conf.power))
-		# We have several optimizers here in order to handle the different lr_mult
-		# which is a kind of parameters in Caffe. This controls the actual lr for each
-		# layer.
+
 		opt_encoder = tf.train.MomentumOptimizer(learning_rate, self.conf.momentum)
 		opt_decoder_w = tf.train.MomentumOptimizer(learning_rate * 10.0, self.conf.momentum)
 		opt_decoder_b = tf.train.MomentumOptimizer(learning_rate * 20.0, self.conf.momentum)
-		# To make sure each layer gets updated by different lr's, we do not use 'minimize' here.
-		# Instead, we separate the steps compute_grads+update_params.
-		# Compute grads
+
 		grads = tf.gradients(self.reduced_loss, encoder_trainable + decoder_w_trainable + decoder_b_trainable)
 		grads_encoder = grads[:len(encoder_trainable)]
 		grads_decoder_w = grads[len(encoder_trainable) : (len(encoder_trainable) + len(decoder_w_trainable))]
 		grads_decoder_b = grads[(len(encoder_trainable) + len(decoder_w_trainable)):]
-		# Update params
+
 		train_op_conv = opt_encoder.apply_gradients(zip(grads_encoder, encoder_trainable))
 		train_op_fc_w = opt_decoder_w.apply_gradients(zip(grads_decoder_w, decoder_w_trainable))
 		train_op_fc_b = opt_decoder_b.apply_gradients(zip(grads_decoder_b, decoder_b_trainable))
-		# Finally, get the train_op!
+
 		update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS) # for collecting moving_mean and moving_variance
 		with tf.control_dependencies(update_ops):
 			self.train_op = tf.group(train_op_conv, train_op_fc_w, train_op_fc_b)
 
-		# Saver for storing checkpoints of the model
 		self.saver = tf.train.Saver(var_list=tf.global_variables(), max_to_keep=0)
 
-		# Loader for loading the pre-trained model
+
 		self.loader = tf.train.Saver(var_list=restore_var)
 
-		# Training summary
-		# Processed predictions: for visualisation.
+
 		raw_output_up = tf.image.resize_bilinear(raw_output, input_size)
 		raw_output_up = tf.argmax(raw_output_up, axis=3)
 		self.pred = tf.expand_dims(raw_output_up, dim=3)
@@ -292,14 +222,7 @@ class Model(object):
 		self.image_batch, self.label_batch = tf.expand_dims(image, dim=0), tf.expand_dims(label, dim=0)
 		
 		# Create network
-		if self.conf.encoder_name not in ['res101', 'res50', 'deeplab']:
-			print('encoder_name ERROR!')
-			print("Please input: res101, res50, or deeplab")
-			sys.exit(-1)
-		elif self.conf.encoder_name == 'deeplab':
-			net = Deeplab_v2(self.image_batch, self.conf.num_classes, False, self.conf.dilated_type)
-		else:
-			net = ResNet_segmentation(self.image_batch, self.conf.num_classes, False, self.conf.encoder_name, self.conf.dilated_type)
+		net = Deeplab_v2(self.image_batch, self.conf.num_classes, False, self.conf.dilated_type)
 
 		# predictions
 		raw_output = net.outputs
@@ -351,15 +274,7 @@ class Model(object):
 		image_batch, label_batch = tf.expand_dims(image, dim=0), tf.expand_dims(label, dim=0)
 
 		# Create network
-		if self.conf.encoder_name not in ['res101', 'res50', 'deeplab']:
-			print('encoder_name ERROR!')
-			print("Please input: res101, res50, or deeplab")
-			sys.exit(-1)
-		elif self.conf.encoder_name == 'deeplab':
-			net = Deeplab_v2(image_batch, self.conf.num_classes, False, self.conf.dilated_type)
-		else:
-			net = ResNet_segmentation(image_batch, self.conf.num_classes, False, self.conf.encoder_name, self.conf.dilated_type)
-
+		net = Deeplab_v2(image_batch, self.conf.num_classes, False, self.conf.dilated_type)
 		# Predictions.
 		raw_output = net.outputs
 		raw_output = tf.image.resize_bilinear(raw_output, tf.shape(image_batch)[1:3,])

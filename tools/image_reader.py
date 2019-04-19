@@ -3,6 +3,9 @@ import os
 import numpy as np
 import tensorflow as tf
 
+
+IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434), dtype=np.float32)
+
 def image_scaling(img, label):
     """
     Randomly scales the images between 0.5 to 1.5 times the original size.
