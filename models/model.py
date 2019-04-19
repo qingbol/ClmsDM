@@ -11,10 +11,6 @@ sys.path.append("..")
 from tools import ImageReader, decode_labels, inv_preprocess, prepare_label, write_log, read_labeled_image_list
 from tools.image_reader import IMG_MEAN
 
-
-
-
-
 class Model(object):
 
 	def __init__(self, sess, conf):
