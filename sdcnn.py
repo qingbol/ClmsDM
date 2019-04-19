@@ -4,18 +4,6 @@ import os
 import tensorflow as tf
 from models.model import Model
 
-def main(_):
-	#call set_parameter function to intialize the super parameters 
-	PARA=set_parameter()
-	print(PARA.data_dir)
-
-	#establish the session variable
-	sess = tf.Session()
-	# establish a model object
-	model = Model(sess, PARA)
-	#start training or testing
-	getattr(model,PARA.action)()
-
 def set_parameter():
 	flags = tf.app.flags
 	# training
@@ -26,7 +14,6 @@ def set_parameter():
 	flags.DEFINE_float('learning_rate', 0.001, 'learning rate')
 	flags.DEFINE_float('power', 0.9, 'hyperparameter for poly learning rate')
 	flags.DEFINE_float('momentum', 0.9, 'momentum')
-	# flags.DEFINE_string('encoder_name', 'deeplab', 'name of pre-trained model: res101, res50 or deeplab')
 	flags.DEFINE_string('pretrain_file', '/Users/tarus/OnlyInMac/dilated_cnn/pretrain_model/deeplab_resnet_init.ckpt', 
 											'pre-trained model filename corresponding to encoder_name')
 	flags.DEFINE_string('dilated_type', 'SSC', 'type of dilated conv: Basic,Decompose,GI,SSC')
@@ -58,12 +45,32 @@ def set_parameter():
 	flags.DEFINE_string('modeldir', 'model', 'model directory')
 	flags.DEFINE_string('logfile', 'log.txt', 'training log filename')
 	flags.DEFINE_string('logdir', 'log', 'training log directory')
-	flags.DEFINE_string('action', 'train', 'train/test/predict')
+	# flags.DEFINE_string('action', 'train', 'train/test/predict')
 	
 	flags.FLAGS.__dict__['__parsed'] = False
 	return flags.FLAGS
 
+def main(_):
+	#call set_parameter function to intialize the super parameters 
+	PARA=set_parameter()
+	# PARA.action='test'
+	# print(PARA.data_dir)
+	# print(PARA.action)
+	print(flags.FLAGS.action)
+
+	#establish the session variable
+	sess = tf.Session()
+	# establish a model object
+	model = Model(sess, PARA)
+	#start training or testing
+	getattr(model,flags.FLAGS.action)()
+
+
 if __name__ == '__main__':
+	flags = tf.app.flags
+	# flags.DEFINE_integer('num_test', 300, 'maximum number of iterations')
+	flags.DEFINE_string('action', 'train', 'train/test/predict')
+	# print(flags.FLAGS.num_test)
 	# set  GPU
 	os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
 	tf.app.run()
